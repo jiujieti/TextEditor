@@ -19,30 +19,31 @@ void enableRawMode() {
   // disable raw mode when the program exits, either by main or exit()  
   atexit(disableRawMode);
 
-  struct termios raw = orig_termios; 
-  // disable ctrl+s and ctrs+q for stop and resume transmission
+  struct termios raw = orig_termios;
+ 
   raw.c_iflag &= ~(IXON | ICRNL | BRKINT | INPCK | ISTRIP);
-
   raw.c_oflag &= ~(OPOST);
-
   raw.c_cflag |= (CS8);
-
-  // char by char reading, diasble ctrl+z and ctrl+c
   raw.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
+  raw.c_cc[VMIN] = 0;
+  raw.c_cc[VTIME] = 1;
 
   tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
 }
 
 int main() {
   enableRawMode();
-  
-  char c;
-  while(read(STDIN_FILENO, &c, 1) == 1 && c != 'q') {
+
+  while(1) {
+    char c;
+    read(STDIN_FILENO, &c, 1);
     if(iscntrl(c)) {
       printf("%d\r\n", c);
     } else {
       printf("%d ('%c')\r\n", c, c);
     }
+    if(c == 'q') break;
   }
+
   return 0;
 }
