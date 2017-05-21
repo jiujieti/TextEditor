@@ -17,6 +17,8 @@
 struct editorConfig {
   // read original terminal ios
   struct termios orig_termios;
+  int screenrows;
+  int screencols;
 };
 
 struct editorConfig E;
@@ -35,12 +37,16 @@ void die(const char *s) {
 
 /* disable raw mode */
 void disableRawMode() {
-  if(tcsetattr(STDIN_FILENO, TCSAFLUSH, &E.orig_termios) == -1) die("tcsetattr");
+  if(tcsetattr(STDIN_FILENO, TCSAFLUSH, &E.orig_termios) == -1) {
+    die("tcsetattr");
+  }
 }
 
 /* enable raw mode */
 void enableRawMode() {
-  if(tcgetattr(STDIN_FILENO, &E.orig_termios) == -1) die("tcgetattr");
+  if(tcgetattr(STDIN_FILENO, &E.orig_termios) == -1) {
+    die("tcgetattr");
+  }
 
   // disable raw mode when the program exits, either by main or exit()  
   atexit(disableRawMode);
@@ -54,14 +60,18 @@ void enableRawMode() {
   raw.c_cc[VMIN] = 0;
   raw.c_cc[VTIME] = 1;
 
-  if(tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == -1) die("tcsetattr");
+  if(tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) == -1) { 
+    die("tcsetattr");
+  }
 }
 
 char editorReadKey() {
   int nread;
   char c;
   while((nread = read(STDIN_FILENO, &c, 1)) != 1) {
-    if(nread == -1 && errno != EAGAIN) die("read");    
+    if(nread == -1 && errno != EAGAIN) {
+      die("read");
+    }    
   }
   return c;
 }
@@ -81,7 +91,7 @@ int getWindowSize(int *rows, int *cols) {
 
 void editorDrawRows() {
   int y;
-  for(y = 0; y < 36; y++) {
+  for(y = 0; y < E.screenrows; y++) {
     write(STDOUT_FILENO, "~\r\n", 3);
   }
 }
@@ -114,8 +124,15 @@ void editorProcessKeypress() {
 
 /*** init ***/
 
+void initEditor() {
+  if(getWindowSize(&E.screenrows, &E.screencols) == -1) {
+    die("getWindowSize");
+  } 
+}
+
 int main() {
   enableRawMode();
+  initEditor();
 
   while(1) {
     editorRefreshScreen();
