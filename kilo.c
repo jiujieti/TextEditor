@@ -56,6 +56,14 @@ char editorReadKey() {
   return c;
 }
 
+/*** output ***/
+
+/* clear the entire screen by using 2J */
+void editorRefreshScreen() {
+  // escape sequences starting wth \x1b instructs terminal to do text formatting tasks
+  write(STDOUT_FILENO, "\x1b[2J", 4);
+}
+
 /*** input ***/
 
 void editorProcessKeypress() {
@@ -74,6 +82,7 @@ int main() {
   enableRawMode();
 
   while(1) {
+    editorRefreshScreen();
     editorProcessKeypress();
   }
 
