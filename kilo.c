@@ -1,41 +1,51 @@
 /*** includes ***/
+
 #include <ctype.h>
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
 
 /*** defines ***/
-#define CTRL_KEY(k) ((k) & 0x1f)
 
+#define CTRL_KEY(k) ((k) & 0x1f)
 
 /*** data ***/
 
-/* read original terminal ios */
-struct termios orig_termios;
+struct editorConfig {
+  // read original terminal ios
+  struct termios orig_termios;
+};
+
+struct editorConfig E;
 
 /*** terminal ***/
 
 /* error handling */
 void die(const char *s) {
+  // clear screen before exit
+  write(STDOUT_FILENO, "\x1b[2J", 4);
+  write(STDERR_FILENO, "\x1b[H", 3);
+
   perror(s);
   exit(1);
 }
 
 /* disable raw mode */
 void disableRawMode() {
-  if(tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios) == -1) die("tcsetattr");
+  if(tcsetattr(STDIN_FILENO, TCSAFLUSH, &E.orig_termios) == -1) die("tcsetattr");
 }
 
 /* enable raw mode */
 void enableRawMode() {
-  if(tcgetattr(STDIN_FILENO, &orig_termios) == -1) die("tcgetattr");
+  if(tcgetattr(STDIN_FILENO, &E.orig_termios) == -1) die("tcgetattr");
 
   // disable raw mode when the program exits, either by main or exit()  
   atexit(disableRawMode);
 
-  struct termios raw = orig_termios;
+  struct termios raw = E.orig_termios;
  
   raw.c_iflag &= ~(IXON | ICRNL | BRKINT | INPCK | ISTRIP);
   raw.c_oflag &= ~(OPOST);
@@ -56,12 +66,36 @@ char editorReadKey() {
   return c;
 }
 
+int getWindowSize(int *rows, int *cols) {
+  struct winsize ws;
+
+  if(ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) == -1 || ws.ws_col == 0) {
+    return -1;
+  }
+  *cols = ws.ws_col;
+  *rows = ws.ws_row;
+  return 0;
+}
+
 /*** output ***/
 
-/* clear the entire screen by using 2J */
+void editorDrawRows() {
+  int y;
+  for(y = 0; y < 36; y++) {
+    write(STDOUT_FILENO, "~\r\n", 3);
+  }
+}
+
 void editorRefreshScreen() {
-  // escape sequences starting wth \x1b instructs terminal to do text formatting tasks
+  // clear the entire screen and move cursor to the bottom-left corner
   write(STDOUT_FILENO, "\x1b[2J", 4);
+
+  // H without coordinates, the cursor is moved to the first row and col
+  write(STDERR_FILENO, "\x1b[H", 3);
+
+  editorDrawRows();
+
+  write(STDERR_FILENO, "\x1b[H", 3);
 }
 
 /*** input ***/
@@ -71,6 +105,8 @@ void editorProcessKeypress() {
 
   switch(c) {
     case(CTRL_KEY('q')):
+      write(STDOUT_FILENO, "\x1b[2J", 4);
+      write(STDERR_FILENO, "\x1b[H", 3);
       exit(0);
       break;
   }
